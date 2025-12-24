@@ -1,10 +1,21 @@
 #include "TwoPosSwitch.h"
 
-TwoPosSwitch::TwoPosSwitch(const pin_size_t pinPos1, const pin_size_t pinPos2)
-    : m_pinPos1(pinPos1), m_pinPos2(pinPos2), m_position(SwitchPosition::POSITION_INVALID)
+TwoPosSwitch::TwoPosSwitch(const pin_size_t pinPos1, const pin_size_t pinPos2, const SwitchConfigMode configMode)
+    : m_pinPos1(pinPos1),
+      m_pinPos2(pinPos2),
+      m_configMode(configMode),
+      m_position(SwitchPosition::POSITION_INVALID)
 {
-    pinMode(m_pinPos1, INPUT);
-    pinMode(m_pinPos2, INPUT);
+    if (m_configMode == SwitchConfigMode::ACTIVE_LOW)
+    {
+        pinMode(m_pinPos1, INPUT_PULLUP);
+        pinMode(m_pinPos2, INPUT_PULLUP);
+    }
+    else
+    {
+        pinMode(m_pinPos1, INPUT);
+        pinMode(m_pinPos2, INPUT);
+    }
 }
 
 SwitchPosition TwoPosSwitch::getRawPosition() const
@@ -14,12 +25,14 @@ SwitchPosition TwoPosSwitch::getRawPosition() const
 
     SwitchPosition newPosition;
 
-    if (pos1State == HIGH && pos2State == LOW)
+    if ((pos1State == HIGH && pos2State == LOW && m_configMode == SwitchConfigMode::ACTIVE_HIGH) ||
+        (pos1State == LOW && pos2State == HIGH && m_configMode == SwitchConfigMode::ACTIVE_LOW))
     {
         // Switch is in position 1
         newPosition = SwitchPosition::POSITION_1;
     }
-    else if (pos1State == LOW && pos2State == HIGH)
+    else if ((pos1State == LOW && pos2State == HIGH && m_configMode == SwitchConfigMode::ACTIVE_HIGH) ||
+             (pos1State == HIGH && pos2State == LOW && m_configMode == SwitchConfigMode::ACTIVE_LOW))
     {
         // Switch is in position 2
         newPosition = SwitchPosition::POSITION_2;

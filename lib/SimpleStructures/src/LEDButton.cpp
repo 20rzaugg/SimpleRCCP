@@ -17,13 +17,13 @@ ButtonState LEDButton::getButtonState()
     PinStatus buttonState = digitalRead(m_btnPin);
     ButtonState newState;
 
-    if (m_configMode == ACTIVE_HIGH)
+    if (m_configMode == ButtonConfigMode::ACTIVE_HIGH)
     {
-        newState = (buttonState == HIGH) ? BUTTON_PRESSED : BUTTON_RELEASED;
+        newState = (buttonState == HIGH) ? ButtonState::BUTTON_PRESSED : ButtonState::BUTTON_RELEASED;
     }
     else // ACTIVE_LOW
     {
-        newState = (buttonState == LOW) ? BUTTON_PRESSED : BUTTON_RELEASED;
+        newState = (buttonState == LOW) ? ButtonState::BUTTON_PRESSED : ButtonState::BUTTON_RELEASED;
     }
 
     m_buttonState = newState;
@@ -35,13 +35,13 @@ ButtonState LEDButton::getButtonState(bool &stateChanged)
     PinStatus buttonState = digitalRead(m_btnPin);
     ButtonState newState;
 
-    if (m_configMode == ACTIVE_HIGH)
+    if (m_configMode == ButtonConfigMode::ACTIVE_HIGH)
     {
-        newState = (buttonState == HIGH) ? BUTTON_PRESSED : BUTTON_RELEASED;
+        newState = (buttonState == HIGH) ? ButtonState::BUTTON_PRESSED : ButtonState::BUTTON_RELEASED;
     }
     else // ACTIVE_LOW
     {
-        newState = (buttonState == LOW) ? BUTTON_PRESSED : BUTTON_RELEASED;
+        newState = (buttonState == LOW) ? ButtonState::BUTTON_PRESSED : ButtonState::BUTTON_RELEASED;
     }
 
     stateChanged = stateChanged || (newState != m_buttonState);

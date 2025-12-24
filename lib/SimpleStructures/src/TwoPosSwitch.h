@@ -2,16 +2,7 @@
 #define TWOPOSSWITCH_H
 
 #include <Arduino.h>
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/// \enum SwitchPosition
-/// \brief Enumeration for the positions of the two position switch
-enum class SwitchPosition
-{
-    POSITION_1 = 0,   ///< Switch is in position 1
-    POSITION_2,       ///< Switch is in position 2
-    POSITION_INVALID  ///< Switch is in an invalid position (neither position 1 nor position 2, or both simultaneously)
-};
+#include "SwitchCommon.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// \class TwoPosSwitch
@@ -23,7 +14,8 @@ public:
     /// \brief Constructor for TwoPosSwitch class
     /// \param pinPos1 Pin number for position 1
     /// \param pinPos2 Pin number for position 2
-    TwoPosSwitch(const pin_size_t pinPos1, const pin_size_t pinPos2);
+    /// \param configMode Configuration mode for the switch
+    TwoPosSwitch(pin_size_t pinPos1, pin_size_t pinPos2, SwitchConfigMode configMode);
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /// \brief Reads the position of the switch
@@ -52,6 +44,8 @@ private:
     pin_size_t m_pinPos1;
     /// \brief Pin number for position 2
     pin_size_t m_pinPos2;
+    /// \brief Configuration mode for the switch
+    SwitchConfigMode m_configMode;
     /// \brief Last known position of the switch
     SwitchPosition m_position = SwitchPosition::POSITION_INVALID;
 };

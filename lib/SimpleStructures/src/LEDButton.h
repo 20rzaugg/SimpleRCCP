@@ -6,7 +6,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// \enum ButtonConfigMode
 /// \brief Enumeration for button configuration modes-
-enum ButtonConfigMode
+enum class ButtonConfigMode
 {
     ACTIVE_HIGH = 0, ///< Button is configured to be active high
     ACTIVE_LOW       ///< Button is configured to be active low
@@ -15,7 +15,7 @@ enum ButtonConfigMode
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// \enum ButtonState
 /// \brief Enumeration for button states
-enum ButtonState
+enum class ButtonState
 {
     BUTTON_RELEASED = 0, ///< Button is released
     BUTTON_PRESSED       ///< Button is pressed
@@ -57,7 +57,7 @@ private:
     /// \brief Pin number for the built-in LED
     pin_size_t m_ledPin;
     /// \brief Current state of the button
-    ButtonState m_buttonState = BUTTON_RELEASED;
+    ButtonState m_buttonState = ButtonState::BUTTON_RELEASED;
     /// \brief Configuration mode for the button
     ButtonConfigMode m_configMode;
 };
