@@ -70,7 +70,6 @@ void updateLCD()
 /// \return void
 void setup()
 {
-    lcd.begin(4, 20);
     pinMode(LCD_BACKLIGHT, OUTPUT);
     pinMode(POWER_LED, OUTPUT);
     pinMode(CONNECTED_LED, OUTPUT);
@@ -109,9 +108,10 @@ void loop()
     static PinStatus faultLed = LOW;
     static PinStatus testLed = LOW;
 
+    bool keySwitchChanged = false;
     bool lcdParamChanged = false;
 
-    if (keySwitch.getState() == SwitchPosition::POSITION_2)
+    if (keySwitch.getState(keySwitchChanged) == SwitchPosition::POSITION_2)
     {
         estopLed = LOW;
         dispatchLed1 = LOW;
@@ -132,6 +132,14 @@ void loop()
     }
     else
     {
+        if (keySwitchChanged)
+        {
+            lcdBacklight = HIGH;
+            digitalWrite(LCD_BACKLIGHT, lcdBacklight);
+            delay(1);
+            lcd.begin(4, 20);
+            lcdParamChanged = true;
+        }
         estopLed = globalBlinkState;
         dispatchLed1 = globalBlinkState;
         dispatchLed2 = globalBlinkState;
