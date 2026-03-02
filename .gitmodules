@@ -1,0 +1,3 @@
+[submodule "py_nl2telemetry"]
+	path = py_nl2telemetry
+	url = https://github.com/bestdani/py_nl2telemetry.git

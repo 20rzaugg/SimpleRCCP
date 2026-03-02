@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <LCDi2c.h>
 #include <string>
+#include <cstdio>
+#include <cstring>
 #include <Wire.h>
 
 #include "PinDef.h"
@@ -24,6 +26,96 @@ LCDi2c lcd(0x27, Wire1);
 
 const uint32_t LOOP_PERIOD_US = 10000;
 const uint32_t BLINK_PERIOD_US = 500000;
+const uint32_t TELEMETRY_TIMEOUT_MS = 1000;
+
+struct TelemetryFrame
+{
+    int inPlayMode;
+    int paused;
+    int braking;
+    int trainInStation;
+    int eStop;
+    int canDispatch;
+    float speed;
+    float gX;
+    float gY;
+    float gZ;
+    uint32_t sequence;
+};
+
+struct SerialTelemetryState
+{
+    char lineBuffer[128];
+    size_t lineLength;
+    uint32_t lastRxMs;
+    bool hasFrame;
+    TelemetryFrame frame;
+};
+
+bool parseTelemetryFrame(const char *line, TelemetryFrame &outFrame)
+{
+    if (line == nullptr || line[0] != 'T' || line[1] != ',')
+    {
+        return false;
+    }
+
+    TelemetryFrame parsed = {};
+    int parsedCount = sscanf(
+        line,
+        "T,%u,%d,%d,%d,%d,%d,%d,%f,%f,%f,%f",
+        &parsed.sequence,
+        &parsed.inPlayMode,
+        &parsed.paused,
+        &parsed.braking,
+        &parsed.trainInStation,
+        &parsed.eStop,
+        &parsed.canDispatch,
+        &parsed.speed,
+        &parsed.gX,
+        &parsed.gY,
+        &parsed.gZ);
+
+    if (parsedCount != 11)
+    {
+        return false;
+    }
+
+    outFrame = parsed;
+    return true;
+}
+
+void pollTelemetrySerial(SerialTelemetryState &telemetryState)
+{
+    while (Serial.available() > 0)
+    {
+        char c = static_cast<char>(Serial.read());
+        if (c == '\r')
+        {
+            continue;
+        }
+
+        if (c == '\n')
+        {
+            telemetryState.lineBuffer[telemetryState.lineLength] = '\0';
+            if (parseTelemetryFrame(telemetryState.lineBuffer, telemetryState.frame))
+            {
+                telemetryState.hasFrame = true;
+                telemetryState.lastRxMs = millis();
+            }
+            telemetryState.lineLength = 0;
+            continue;
+        }
+
+        if (telemetryState.lineLength < (sizeof(telemetryState.lineBuffer) - 1))
+        {
+            telemetryState.lineBuffer[telemetryState.lineLength++] = c;
+        }
+        else
+        {
+            telemetryState.lineLength = 0;
+        }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// \brief Syncs the loop timing to maintain a consistent loop period
@@ -57,12 +149,26 @@ void updateBlinkCounter(uint32_t &blinkCounterUs, PinStatus &globalBlinkState)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// \brief Updates the LCD display with current parameters
 /// \return void
-void updateLCD()
+void updateLCD(const SerialTelemetryState &telemetryState, bool telemetryFresh)
 {
     lcd.cls();
     lcd.locate(1, 1);
-    lcd.print("Hello World!");
-    // Placeholder for LCD update logic
+    if (!telemetryFresh)
+    {
+        lcd.print("No telemetry");
+        return;
+    }
+
+    char row1[21];
+    char row2[21];
+    snprintf(row1, sizeof(row1), "Spd:%6.2f  Gy:%5.2f", telemetryState.frame.speed, telemetryState.frame.gY);
+    snprintf(row2, sizeof(row2), "In:%d Br:%d Seq:%lu",
+             telemetryState.frame.inPlayMode,
+             telemetryState.frame.braking,
+             static_cast<unsigned long>(telemetryState.frame.sequence));
+    lcd.print(row1);
+    lcd.locate(2, 1);
+    lcd.print(row2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,6 +176,8 @@ void updateLCD()
 /// \return void
 void setup()
 {
+    Serial.begin(115200);
+
     pinMode(LCD_BACKLIGHT, OUTPUT);
     pinMode(POWER_LED, OUTPUT);
     pinMode(CONNECTED_LED, OUTPUT);
@@ -107,9 +215,15 @@ void loop()
     static PinStatus gatesLed = LOW;
     static PinStatus faultLed = LOW;
     static PinStatus testLed = LOW;
+    static SerialTelemetryState telemetryState = {};
 
     bool keySwitchChanged = false;
     bool lcdParamChanged = false;
+    static uint32_t lastLcdUpdateMs = 0;
+
+    pollTelemetrySerial(telemetryState);
+    bool telemetryFresh = telemetryState.hasFrame &&
+                          ((millis() - telemetryState.lastRxMs) <= TELEMETRY_TIMEOUT_MS);
 
     if (keySwitch.getState(keySwitchChanged) == SwitchPosition::POSITION_2)
     {
@@ -140,22 +254,47 @@ void loop()
             lcd.begin(4, 20);
             lcdParamChanged = true;
         }
-        estopLed = globalBlinkState;
-        dispatchLed1 = globalBlinkState;
-        dispatchLed2 = globalBlinkState;
+
+        if (telemetryFresh)
+        {
+            estopLed = telemetryState.frame.eStop ? HIGH : LOW;
+            dispatchLed1 = telemetryState.frame.canDispatch ? HIGH : LOW;
+            dispatchLed2 = telemetryState.frame.canDispatch ? HIGH : LOW;
+            connectedLed = HIGH;
+            engagedLed = telemetryState.frame.inPlayMode ? HIGH : LOW;
+            readyLed = telemetryState.frame.trainInStation ? HIGH : LOW;
+            trainStationLed = telemetryState.frame.trainInStation ? HIGH : LOW;
+            faultLed = telemetryState.frame.paused ? HIGH : LOW;
+
+            // Blink test LED while braking so serial updates can be visually verified.
+            testLed = telemetryState.frame.braking ? globalBlinkState : LOW;
+        }
+        else
+        {
+            estopLed = globalBlinkState;
+            dispatchLed1 = globalBlinkState;
+            dispatchLed2 = globalBlinkState;
+            connectedLed = globalBlinkState;
+            engagedLed = globalBlinkState;
+            readyLed = globalBlinkState;
+            trainStationLed = globalBlinkState;
+            faultLed = globalBlinkState;
+            testLed = globalBlinkState;
+        }
+
         lcdBacklight = HIGH;
         powerLed = globalBlinkState;
-        connectedLed = globalBlinkState;
-        engagedLed = globalBlinkState;
         resetLed = globalBlinkState;
-        readyLed = globalBlinkState;
-        trainStationLed = globalBlinkState;
         floorLed = globalBlinkState;
         seatsLed = globalBlinkState;
         restraintsLed = globalBlinkState;
         gatesLed = globalBlinkState;
-        faultLed = globalBlinkState;
-        testLed = globalBlinkState;
+    }
+
+    if ((millis() - lastLcdUpdateMs) >= 200)
+    {
+        lcdParamChanged = true;
+        lastLcdUpdateMs = millis();
     }
 
     eStopButton.setLED(estopLed);
@@ -178,7 +317,7 @@ void loop()
     // If an LCD parameter has changed, update the display
     if (lcdParamChanged)
     {
-      updateLCD();
+      updateLCD(telemetryState, telemetryFresh);
     }
 
     // Sync loop timing and update blink counter
